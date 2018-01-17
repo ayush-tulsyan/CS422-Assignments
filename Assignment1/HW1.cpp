@@ -31,16 +31,14 @@ END_LEGAL */
 #include <iostream>
 #include <fstream>
 #include "pin.H"
+#include "counters.h"
 
 ofstream OutFile;
 
-// The running count of instructions is kept here
-// make it static to help the compiler optimize docount
-static UINT64 icount = 0;
-static UINT64 total_count = 0;
-static UINT64 fast_forward_count = 0;
+/*
+ * helper functions used across the tool
+ */
 
-// Knob Modification/Analysis Functions
 void InsCount() {
     icount++;
 }
@@ -49,16 +47,104 @@ ADDRINT FastForwardCheck(void) {
     return (icount >= fast_forward_count && icount < fast_forward_count + total_count);
 }
 
-void AnalysisRoutine(void) {
-    return;
+void AnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_type) {
+    // Part A and B
+    ins_type_count[LOADS] += num_loads;
+    ins_type_count[STORES] += num_stores;
+    ins_type_count[ins_type] ++;
 }
 
 ADDRINT TerminateCheck(void) {
     return (icount >= fast_forward_count + total_count);
 }
 
-void ExitRoutine(void) {
+/*
+ * For Part A and B of the assignment
+ * Counts the number of memory read and memory write in an instruction
+ * Also classifies it among type A instructions
+ *
+ */
+UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
+    UINT32 memOperands = INS_MemoryOperandCount(ins);
+
+    // Iterate over each memory operand of the instruction to get number
+    // of loads and stores
+    for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
+        if (INS_MemoryOperandIsRead(ins, memOp))
+            ++ num_loads;
+
+        if (INS_MemoryOperandIsWritten(ins, memOp))
+            ++ num_stores;
+    }
+
+    INT32 ins_category = INS_Category(ins);
+
+    // Check the type of instruction
+    if (ins_category == XED_CATEGORY_NOP) {
+        return NOPS;
+    } else if (ins_category == XED_CATEGORY_CALL) {
+        if (INS_IsDirectCall(ins))
+            return DIRECT_CALLS;
+        else
+            return INDIRECT_CALLS;
+    } else if (ins_category == XED_CATEGORY_RET) {
+        return RETURNS;
+    } else if (ins_category == XED_CATEGORY_UNCOND_BR) {
+        return UNCONDITIONAL_BRANCHES;
+    } else if (ins_category == XED_CATEGORY_COND_BR) {
+        return CONDITIONAL_BRANCHES;
+    } else if (ins_category == XED_CATEGORY_LOGICAL) {
+        return LOGICAL_OPERATIONS;
+    } else if ((ins_category == XED_CATEGORY_ROTATE) ||
+        (ins_category == XED_CATEGORY_SHIFT)) {
+        return ROTATE_AND_SHIFT;
+    } else if (ins_category == XED_CATEGORY_FLAGOP) {
+        return FLAG_OPERATIONS;
+    } else if ((ins_category == XED_CATEGORY_AVX) ||
+             (ins_category == XED_CATEGORY_AVX2) ||
+             (ins_category == XED_CATEGORY_AVX2GATHER)) {
+        return VECTOR_INSTRUCTIONS;
+    } else if (ins_category == XED_CATEGORY_CMOV) {
+        return CONDITIONAL_MOVES;
+    } else if ((ins_category == XED_CATEGORY_MMX) ||
+             (ins_category == XED_CATEGORY_SSE)) {
+        return MMX_AND_SSE_INSTRUCTIONS;
+    } else if (ins_category == XED_CATEGORY_SYSCALL) {
+        return SYSTEM_CALLS;
+    } else if (ins_category == XED_CATEGORY_X87_ALU) {
+        return FLOATING_POINT;
+    } else {
+        return THE_REST;
+    }
+}
+
+/*
+ * For printing stats found in part A and B of the assignment
+ */
+void PrintStatsAB(void) {
+    OutFile << "Instruction type data: \n";
+
+    UINT64 ins_count_sum = 0;
+    for(int i = 0; i < NUM_INS_TYPE; ++ i)
+        ins_count_sum += ins_type_count[i];
+
+    for(int i = 0; i < NUM_INS_TYPE; ++ i) {
+        OutFile << InsTypeLiterals[i] << ": " << ins_type_count[i] <<
+           " (" << 1.0D*ins_type_count[i]/ins_count_sum << ")" << '\n';
+    }
+
+    UINT64 load_store_count = ins_type_count[LOADS] + ins_type_count[STORES];
+    UINT64 total_cycles = (ins_count_sum - load_store_count) +
+                            50 * load_store_count;
+
+    OutFile << "CPI: " << 1.0D*total_cycles/
+               (icount - fast_forward_count) << '\n';
+}
+
+void ExitHandler(void) {
+    // OutFile << fixed << setprecision(6);
     OutFile << "The number of instructions executed: " << icount - fast_forward_count << endl;
+    PrintStatsAB();
     exit(0);
 }
 
@@ -69,10 +155,20 @@ VOID Instruction(INS ins, VOID *v)
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsCount, IARG_END);
 
     INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) TerminateCheck, IARG_END);
-    INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR) ExitRoutine, IARG_END);
+    INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR) ExitHandler, IARG_END);
 
+    // get instruction type, number of reads and writes from/to Memory
+    UINT32 num_loads = 0, num_stores = 0;
+    UINT32 ins_type = DecodeInsInfo(ins, num_loads, num_stores);
+
+    // Instrument the instruction with a check and analysis calls
     INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
-    INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR) AnalysisRoutine, IARG_END);
+    INS_InsertThenCall(
+            ins, IPOINT_BEFORE, (AFUNPTR) AnalysisRoutine,
+            IARG_UINT32, num_loads,
+            IARG_UINT32, num_stores,
+            IARG_UINT32, ins_type,
+            IARG_END);
 }
 
 /* ===================================================================== */
