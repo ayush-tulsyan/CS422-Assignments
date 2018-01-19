@@ -47,7 +47,7 @@ ADDRINT FastForwardCheck(void) {
     return (icount >= fast_forward_count && icount < fast_forward_count + total_count);
 }
 
-void AnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_type) {
+void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_type) {
     // Part A and B
     ins_type_count[LOADS] += num_loads;
     ins_type_count[STORES] += num_stores;
@@ -65,16 +65,20 @@ ADDRINT TerminateCheck(void) {
  *
  */
 UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
-    UINT32 memOperands = INS_MemoryOperandCount(ins);
+    num_loads = 0, num_stores = 0;
 
     // Iterate over each memory operand of the instruction to get number
     // of loads and stores
+    UINT32 memOperands = INS_MemoryOperandCount(ins);
     for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
+
+        // Get number of words to be loaded/stored
+        UINT32 num_words = (INS_MemoryOperandSize(ins, memOp) + 3)>>2;
         if (INS_MemoryOperandIsRead(ins, memOp))
-            ++ num_loads;
+            num_loads += num_words;
 
         if (INS_MemoryOperandIsWritten(ins, memOp))
-            ++ num_stores;
+            num_stores += num_words;
     }
 
     INT32 ins_category = INS_Category(ins);
@@ -149,26 +153,27 @@ void ExitHandler(void) {
 }
 
 // Pin calls this function every time a new instruction is encountered
-VOID Instruction(INS ins, VOID *v)
-{
-    // Insert a call to docount before every instruction, no arguments are passed
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsCount, IARG_END);
-
+VOID Instruction(INS ins, VOID *v) {
+    // If terminate or not
     INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) TerminateCheck, IARG_END);
     INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR) ExitHandler, IARG_END);
 
     // get instruction type, number of reads and writes from/to Memory
-    UINT32 num_loads = 0, num_stores = 0;
+    UINT32 num_loads, num_stores;
     UINT32 ins_type = DecodeInsInfo(ins, num_loads, num_stores);
 
     // Instrument the instruction with a check and analysis calls
-    INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
-    INS_InsertThenCall(
-            ins, IPOINT_BEFORE, (AFUNPTR) AnalysisRoutine,
+    INS_InsertIfPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck,
+            IARG_END);
+    INS_InsertThenPredicatedCall(
+            ins, IPOINT_BEFORE, (AFUNPTR) PredicatedAnalysisRoutine,
             IARG_UINT32, num_loads,
             IARG_UINT32, num_stores,
             IARG_UINT32, ins_type,
             IARG_END);
+
+    // Insert a call to InsCount before every instruction
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsCount, IARG_END);
 }
 
 /* ===================================================================== */
@@ -217,8 +222,8 @@ int main(int argc, char * argv[])
     if (PIN_Init(argc, argv)) return Usage();
 
     OutFile.open(KnobOutputFile.Value().c_str());
-    total_count = 1e6 * KnobInsCount.Value();
-    fast_forward_count = 1e6 * KnobFastForwardCount.Value();
+    total_count = 1e9 * KnobInsCount.Value();
+    fast_forward_count = 1e9 * KnobFastForwardCount.Value();
 
     // Register Instruction to be called to instrument instructions
     INS_AddInstrumentFunction(Instruction, 0);
