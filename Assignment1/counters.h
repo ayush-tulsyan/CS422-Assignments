@@ -14,10 +14,12 @@ static UINT64 fast_forward_count = 0;
  */
 
 const int NUM_INS_TYPE = 17;
+const int NUM_FOOTPRINT_TYPE = 2;
+const int NUM_MEMORY_BLOCKS = (1<<28);
 
 enum InsType{
-        LOADS,
-        STORES,
+    LOADS,
+    STORES,
 	NOPS,
 	DIRECT_CALLS,
 	INDIRECT_CALLS,
@@ -55,4 +57,15 @@ string InsTypeLiterals[] = {
 	"The rest"
 };
 
+enum FootprintType{
+    INSTRUCTION_FOOTPRINT,
+    DATA_FOOTPRINT
+};
+
+string FootprintTypeLiterals[] = {
+    "Instruction Blocks Accesses",
+    "Data Blocks Accesses"
+};
+
 static UINT64 ins_type_count[NUM_INS_TYPE] = {};
+static bool footprint[NUM_FOOTPRINT_TYPE][NUM_MEMORY_BLOCKS] = {};

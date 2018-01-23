@@ -54,6 +54,24 @@ void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_t
     ins_type_count[ins_type] ++;
 }
 
+/*
+ * addr_start : The start address for the memory space(byte address)
+ * size : The size of the memory space(in bytes)
+ * select : A self defined enum type to differentiate between instruction and data footprint
+ *
+ * Determine the start and end blocks memory space and set those memory locations
+ * to true in the memory footprint
+ */
+void NonPredicatedAnalysisRoutine(intptr_t addr_start, UINT32 size, UINT32 selec){
+    // Part C
+
+    UINT32 block_start = addr_start>>5;
+    UINT32 block_end = (addr_start+size)>>5;
+    for(UINT32 i=block_start; i<=block_end; i++){
+        footprint[selec][i] = true;
+    }
+}
+
 ADDRINT TerminateCheck(void) {
     return (icount >= fast_forward_count + total_count);
 }
@@ -123,10 +141,11 @@ UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
 }
 
 /*
- * For printing stats found in part A and B of the assignment
+ * For printing stats found in parts A, B, and C of the assignment
  */
-void PrintStatsAB(void) {
+void PrintStatsABC(void) {
     OutFile << "Instruction type data: \n";
+    // OutFile << footprint_data[0] <<"\n";
 
     UINT64 ins_count_sum = 0;
     for(int i = 0; i < NUM_INS_TYPE; ++ i)
@@ -143,12 +162,23 @@ void PrintStatsAB(void) {
 
     OutFile << "CPI: " << 1.0D*total_cycles/
                (icount - fast_forward_count) << '\n';
+
+    int num_ins_blocks = 0, num_data_blocks = 0;
+    for(int i=0;i<NUM_MEMORY_BLOCKS;i++){
+        if(footprint[INSTRUCTION_FOOTPRINT][i]) num_ins_blocks++;
+        if(footprint[DATA_FOOTPRINT][i]) num_data_blocks++;
+    }
+
+    OutFile << FootprintTypeLiterals[INSTRUCTION_FOOTPRINT] << ": " << num_ins_blocks<< "\n";
+    OutFile << FootprintTypeLiterals[DATA_FOOTPRINT] << ": " << num_data_blocks<< "\n";
+
 }
 
 void ExitHandler(void) {
     // OutFile << fixed << setprecision(6);
     OutFile << "The number of instructions executed: " << icount - fast_forward_count << endl;
-    PrintStatsAB();
+
+    PrintStatsABC();
     exit(0);
 }
 
@@ -158,6 +188,7 @@ VOID Instruction(INS ins, VOID *v) {
     INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) TerminateCheck, IARG_END);
     INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR) ExitHandler, IARG_END);
 
+    // Part A, B
     // get instruction type, number of reads and writes from/to Memory
     UINT32 num_loads, num_stores;
     UINT32 ins_type = DecodeInsInfo(ins, num_loads, num_stores);
@@ -171,6 +202,30 @@ VOID Instruction(INS ins, VOID *v) {
             IARG_UINT32, num_stores,
             IARG_UINT32, ins_type,
             IARG_END);
+
+    // Part C
+    // Instrument the instruction for its memory footprint
+    INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
+    INS_InsertThenCall(
+            ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+            IARG_INST_PTR,
+            IARG_UINT32, INS_Size(ins),
+            IARG_UINT32, INSTRUCTION_FOOTPRINT,
+            IARG_END);
+
+    // Iterate over each memory operand of the instruction to get its memory footprint
+    UINT32 memOperands = INS_MemoryOperandCount(ins);
+    for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
+
+        // Get footprint for the memory operands
+        INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
+        INS_InsertThenCall(
+                ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+                IARG_MEMORYOP_EA, memOp,
+                IARG_UINT32, INS_MemoryOperandSize(ins, memOp),
+                IARG_UINT32, DATA_FOOTPRINT,
+                IARG_END);
+    }
 
     // Insert a call to InsCount before every instruction
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsCount, IARG_END);
