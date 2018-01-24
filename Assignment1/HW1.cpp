@@ -66,7 +66,7 @@ void NonPredicatedAnalysisRoutine(intptr_t addr_start, UINT32 size, UINT32 selec
     // Part C
 
     UINT32 block_start = addr_start>>5;
-    UINT32 block_end = (addr_start+size)>>5;
+    UINT32 block_end = (addr_start+size-1)>>5;
     for(UINT32 i=block_start; i<=block_end; i++){
         footprint[selec][i] = true;
     }
