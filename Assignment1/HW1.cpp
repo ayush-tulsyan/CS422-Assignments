@@ -62,7 +62,7 @@ void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_t
  * Determine the start and end blocks memory space and set those memory locations
  * to true in the memory footprint
  */
-void NonPredicatedAnalysisRoutine(intptr_t addr_start, UINT32 size, UINT32 selec){
+void NonPredicatedAnalysisRoutine(ADDRINT addr_start, UINT32 size, UINT32 selec){
     // Part C
 
     UINT32 block_start = addr_start>>5;
@@ -217,14 +217,27 @@ VOID Instruction(INS ins, VOID *v) {
     UINT32 memOperands = INS_MemoryOperandCount(ins);
     for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
 
-        // Get footprint for the memory operands
-        INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
-        INS_InsertThenCall(
-                ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
-                IARG_MEMORYOP_EA, memOp,
-                IARG_UINT32, INS_MemoryOperandSize(ins, memOp),
-                IARG_UINT32, DATA_FOOTPRINT,
-                IARG_END);
+        if (INS_MemoryOperandIsRead(ins, memOp)){
+            // Get footprint for the memory operands: read
+            INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
+            INS_InsertThenCall(
+                    ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+                    IARG_MEMORYREAD_EA,
+                    IARG_MEMORYREAD_SIZE,
+                    IARG_UINT32, DATA_FOOTPRINT,
+                    IARG_END);
+        }
+
+        if (INS_MemoryOperandIsWritten(ins, memOp)){
+            // Get footprint for the memory operands: write
+            INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
+            INS_InsertThenCall(
+                    ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+                    IARG_MEMORYWRITE_EA,
+                    IARG_MEMORYWRITE_SIZE,
+                    IARG_UINT32, DATA_FOOTPRINT,
+                    IARG_END);
+        }
     }
 
     // Insert a call to InsCount before every instruction

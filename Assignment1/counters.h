@@ -15,7 +15,7 @@ static UINT64 fast_forward_count = 0;
 
 const int NUM_INS_TYPE = 17;
 const int NUM_FOOTPRINT_TYPE = 2;
-const int NUM_MEMORY_BLOCKS = (1<<28);
+const int NUM_MEMORY_BLOCKS = (1<<29);
 
 enum InsType{
     LOADS,
