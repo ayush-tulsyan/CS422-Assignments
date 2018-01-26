@@ -47,14 +47,33 @@ ADDRINT FastForwardCheck(void) {
     return (icount >= fast_forward_count && icount < fast_forward_count + total_count);
 }
 
-void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_type) {
+void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores,
+                               UINT32 ins_type, UINT32 num_mem_operands,
+                               UINT32 num_mem_read_op, UINT32 num_mem_write_op
+                               ) {
     // Part A and B
     ins_type_count[LOADS] += num_loads;
     ins_type_count[STORES] += num_stores;
     ins_type_count[ins_type] ++;
+
+    // Part D
+    num_mem_op_count[num_mem_operands] += 1;
+    num_mem_read_op_count[num_mem_read_op] += 1;
+    num_mem_write_op_count[num_mem_write_op] += 1;
+}
+
+void NonPredicatedAnalysisRoutine(UINT32 ins_len, UINT32 num_operands,
+                                  UINT32 num_reg_reads, UINT32 num_reg_writes) {
+    // Part D
+    ins_len_count[ins_len] += 1;
+    num_operand_count[num_operands] += 1;
+    num_reg_read_op_count[num_reg_reads] += 1;
+    num_reg_write_op_count[num_reg_writes] += 1;
 }
 
 /*
+ * Part C
+ *
  * addr_start : The start address for the memory space(byte address)
  * size : The size of the memory space(in bytes)
  * select : A self defined enum type to differentiate between instruction and data footprint
@@ -62,9 +81,7 @@ void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores, UINT32 ins_t
  * Determine the start and end blocks memory space and set those memory locations
  * to true in the memory footprint
  */
-void NonPredicatedAnalysisRoutine(ADDRINT addr_start, UINT32 size, UINT32 selec){
-    // Part C
-
+void FootprintRoutine(ADDRINT addr_start, UINT32 size, UINT32 selec){
     UINT32 block_start = addr_start>>5;
     UINT32 block_end = (addr_start+size-1)>>5;
     for(UINT32 i=block_start; i<=block_end; i++){
@@ -87,8 +104,8 @@ UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
 
     // Iterate over each memory operand of the instruction to get number
     // of loads and stores
-    UINT32 memOperands = INS_MemoryOperandCount(ins);
-    for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
+    UINT32 num_mem_operands = INS_MemoryOperandCount(ins);
+    for (UINT32 memOp = 0; memOp < num_mem_operands; memOp++) {
 
         // Get number of words to be loaded/stored
         UINT32 num_words = (INS_MemoryOperandSize(ins, memOp) + 3)>>2;
@@ -143,7 +160,7 @@ UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
 /*
  * For printing stats found in parts A, B, and C of the assignment
  */
-void PrintStatsABC(void) {
+void PrintStats(void) {
     OutFile << "Instruction type data: \n";
     // OutFile << footprint_data[0] <<"\n";
 
@@ -172,13 +189,47 @@ void PrintStatsABC(void) {
     OutFile << FootprintTypeLiterals[INSTRUCTION_FOOTPRINT] << ": " << num_ins_blocks<< "\n";
     OutFile << FootprintTypeLiterals[DATA_FOOTPRINT] << ": " << num_data_blocks<< "\n";
 
+    OutFile << "Instruction Size distribution:" << endl;
+    for(int i=0; i<=MAX_INS_SIZE;i++){
+        OutFile << i << ": " << ins_len_count[i] << endl;
+    }
+
+    OutFile << "Operand count distribution:" << endl;
+    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
+        OutFile << i << ": " << num_operand_count[i] << endl;
+    }
+
+    OutFile << "Register read operand count distribution:" << endl;
+    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
+        OutFile << i << ": " << num_reg_read_op_count[i] << endl;
+    }
+
+    OutFile << "Register write operand count distribution:" << endl;
+    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
+        OutFile << i << ": " << num_reg_write_op_count[i] << endl;
+    }
+
+    OutFile << "Memory operand count distribution:" << endl;
+    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
+        OutFile << i << ": " << num_mem_op_count[i] << endl;
+    }
+
+    OutFile << "Read memory operand count distribution:" << endl;
+    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
+        OutFile << i << ": " << num_mem_read_op_count[i] << endl;
+    }
+
+    OutFile << "Write memory operand count distribution:" << endl;
+    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
+        OutFile << i << ": " << num_mem_write_op_count[i] << endl;
+    }
 }
 
 void ExitHandler(void) {
     // OutFile << fixed << setprecision(6);
     OutFile << "The number of instructions executed: " << icount - fast_forward_count << endl;
 
-    PrintStatsABC();
+    PrintStats();
     exit(0);
 }
 
@@ -193,35 +244,34 @@ VOID Instruction(INS ins, VOID *v) {
     UINT32 num_loads, num_stores;
     UINT32 ins_type = DecodeInsInfo(ins, num_loads, num_stores);
 
-    // Instrument the instruction with a check and analysis calls
-    INS_InsertIfPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck,
-            IARG_END);
-    INS_InsertThenPredicatedCall(
-            ins, IPOINT_BEFORE, (AFUNPTR) PredicatedAnalysisRoutine,
-            IARG_UINT32, num_loads,
-            IARG_UINT32, num_stores,
-            IARG_UINT32, ins_type,
-            IARG_END);
+    // Part C, D
+    UINT32 ins_len = INS_Size(ins);
+    UINT32 num_mem_operands = INS_MemoryOperandCount(ins);
+    UINT32 num_operands = INS_OperandCount(ins);
+    UINT32 num_reg_reads = INS_MaxNumRRegs(ins);
+    UINT32 num_reg_writes = INS_MaxNumWRegs(ins);
+    UINT32 num_mem_read_op = 0, num_mem_write_op = 0;
 
     // Part C
     // Instrument the instruction for its memory footprint
     INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
     INS_InsertThenCall(
-            ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+            ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
             IARG_INST_PTR,
-            IARG_UINT32, INS_Size(ins),
+            IARG_UINT32, ins_len,
             IARG_UINT32, INSTRUCTION_FOOTPRINT,
             IARG_END);
 
     // Iterate over each memory operand of the instruction to get its memory footprint
-    UINT32 memOperands = INS_MemoryOperandCount(ins);
-    for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
+    for (UINT32 memOp = 0; memOp < num_mem_operands; memOp++) {
 
         if (INS_MemoryOperandIsRead(ins, memOp)){
             // Get footprint for the memory operands: read
+
+            ++ num_mem_read_op;
             INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
             INS_InsertThenCall(
-                    ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+                    ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
                     IARG_MEMORYREAD_EA,
                     IARG_MEMORYREAD_SIZE,
                     IARG_UINT32, DATA_FOOTPRINT,
@@ -230,15 +280,44 @@ VOID Instruction(INS ins, VOID *v) {
 
         if (INS_MemoryOperandIsWritten(ins, memOp)){
             // Get footprint for the memory operands: write
+
+            ++ num_mem_write_op;
             INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
             INS_InsertThenCall(
-                    ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+                    ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
                     IARG_MEMORYWRITE_EA,
                     IARG_MEMORYWRITE_SIZE,
                     IARG_UINT32, DATA_FOOTPRINT,
                     IARG_END);
         }
     }
+
+    INS_InsertIfPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck,
+            IARG_END);
+    INS_InsertThenPredicatedCall(
+            ins, IPOINT_BEFORE, (AFUNPTR) PredicatedAnalysisRoutine,
+
+            // Part A
+            IARG_UINT32, num_loads,
+            IARG_UINT32, num_stores,
+            IARG_UINT32, ins_type,
+
+            // Part D
+            IARG_UINT32, num_mem_operands,
+            IARG_UINT32, num_mem_read_op,
+            IARG_UINT32, num_mem_write_op,
+            IARG_END);
+
+    INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
+    INS_InsertThenCall(
+            ins, IPOINT_BEFORE, (AFUNPTR) NonPredicatedAnalysisRoutine,
+
+            // Part D
+            IARG_UINT32, ins_len,
+            IARG_UINT32, num_operands,
+            IARG_UINT32, num_reg_reads,
+            IARG_UINT32, num_reg_writes,
+            IARG_END);
 
     // Insert a call to InsCount before every instruction
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsCount, IARG_END);
