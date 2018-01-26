@@ -36,13 +36,17 @@ END_LEGAL */
 ofstream OutFile;
 
 /*
- * helper functions used across the tool
+ * Increase the number of instructions executed by 1
  */
-
 void InsCount() {
     icount++;
 }
 
+/*
+ * Check whether the required number of instructions have been fast forwarded
+ * Returns 1 in case of sufficient instructions fast forwarded
+ * Returns 0 otherwise
+ */
 ADDRINT FastForwardCheck(void) {
     return (icount >= fast_forward_count && icount < fast_forward_count + total_count);
 }
@@ -82,6 +86,7 @@ void NonPredicatedAnalysisRoutine(UINT32 ins_len, UINT32 num_operands,
  * to true in the memory footprint
  */
 void FootprintRoutine(ADDRINT addr_start, UINT32 size, UINT32 selec){
+    // cout<<addr_start<<size<<selec;
     UINT32 block_start = addr_start>>5;
     UINT32 block_end = (addr_start+size-1)>>5;
     for(UINT32 i=block_start; i<=block_end; i++){
@@ -89,6 +94,11 @@ void FootprintRoutine(ADDRINT addr_start, UINT32 size, UINT32 selec){
     }
 }
 
+/*
+ * Check if the required number of instructions have been executed
+ * return 1 in case required number of instructions completed
+ * return 0 otherwise
+ */
 ADDRINT TerminateCheck(void) {
     return (icount >= fast_forward_count + total_count);
 }
@@ -97,7 +107,6 @@ ADDRINT TerminateCheck(void) {
  * For Part A and B of the assignment
  * Counts the number of memory read and memory write in an instruction
  * Also classifies it among type A instructions
- *
  */
 UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
     num_loads = 0, num_stores = 0;
@@ -158,12 +167,13 @@ UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
 }
 
 /*
- * For printing stats found in parts A, B, and C of the assignment
+ * For printing stats found in parts A, B, C, and D of the assignment
  */
 void PrintStats(void) {
     OutFile << "Instruction type data: \n";
     // OutFile << footprint_data[0] <<"\n";
 
+    // Part A,B
     UINT64 ins_count_sum = 0;
     for(int i = 0; i < NUM_INS_TYPE; ++ i)
         ins_count_sum += ins_type_count[i];
@@ -180,6 +190,7 @@ void PrintStats(void) {
     OutFile << "CPI: " << 1.0D*total_cycles/
                (icount - fast_forward_count) << '\n';
 
+    // Part C
     int num_ins_blocks = 0, num_data_blocks = 0;
     for(int i=0;i<NUM_MEMORY_BLOCKS;i++){
         if(footprint[INSTRUCTION_FOOTPRINT][i]) num_ins_blocks++;
@@ -189,6 +200,7 @@ void PrintStats(void) {
     OutFile << FootprintTypeLiterals[INSTRUCTION_FOOTPRINT] << ": " << num_ins_blocks<< "\n";
     OutFile << FootprintTypeLiterals[DATA_FOOTPRINT] << ": " << num_data_blocks<< "\n";
 
+    // Part D
     OutFile << "Instruction Size distribution:" << endl;
     for(int i=0; i<=MAX_INS_SIZE;i++){
         OutFile << i << ": " << ins_len_count[i] << endl;
@@ -225,6 +237,10 @@ void PrintStats(void) {
     }
 }
 
+/*
+ * Handles the premature exiting of the programs
+ * print out the stats gathered till now and exit
+ */
 void ExitHandler(void) {
     // OutFile << fixed << setprecision(6);
     OutFile << "The number of instructions executed: " << icount - fast_forward_count << endl;
@@ -240,7 +256,7 @@ VOID Instruction(INS ins, VOID *v) {
     INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR) ExitHandler, IARG_END);
 
     // Part A, B
-    // get instruction type, number of reads and writes from/to Memory
+    // Get instruction type, number of reads and writes from/to Memory
     UINT32 num_loads, num_stores;
     UINT32 ins_type = DecodeInsInfo(ins, num_loads, num_stores);
 
@@ -250,7 +266,8 @@ VOID Instruction(INS ins, VOID *v) {
     UINT32 num_operands = INS_OperandCount(ins);
     UINT32 num_reg_reads = INS_MaxNumRRegs(ins);
     UINT32 num_reg_writes = INS_MaxNumWRegs(ins);
-    UINT32 num_mem_read_op = 0, num_mem_write_op = 0;
+    UINT32 num_mem_read_op = 0;
+    UINT32 num_mem_write_op = 0;
 
     // Part C
     // Instrument the instruction for its memory footprint
@@ -264,31 +281,23 @@ VOID Instruction(INS ins, VOID *v) {
 
     // Iterate over each memory operand of the instruction to get its memory footprint
     for (UINT32 memOp = 0; memOp < num_mem_operands; memOp++) {
+        if(memOp!=0) std::cout<<"The memory op is "<<memOp<<"\n";
 
+        // Get footprint for the memory operands
+        INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
+        INS_InsertThenCall(
+                ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
+                IARG_MEMORYOP_EA, memOp,
+                IARG_UINT32, INS_MemoryOperandSize(ins, memOp),
+                IARG_UINT32, DATA_FOOTPRINT,
+                IARG_END);
+
+        // Update the counts of read and write operations
         if (INS_MemoryOperandIsRead(ins, memOp)){
-            // Get footprint for the memory operands: read
-
             ++ num_mem_read_op;
-            INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
-            INS_InsertThenCall(
-                    ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
-                    IARG_MEMORYREAD_EA,
-                    IARG_MEMORYREAD_SIZE,
-                    IARG_UINT32, DATA_FOOTPRINT,
-                    IARG_END);
         }
-
         if (INS_MemoryOperandIsWritten(ins, memOp)){
-            // Get footprint for the memory operands: write
-
             ++ num_mem_write_op;
-            INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
-            INS_InsertThenCall(
-                    ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
-                    IARG_MEMORYWRITE_EA,
-                    IARG_MEMORYWRITE_SIZE,
-                    IARG_UINT32, DATA_FOOTPRINT,
-                    IARG_END);
         }
     }
 
@@ -328,13 +337,13 @@ VOID Instruction(INS ins, VOID *v) {
 /* ===================================================================== */
 
 KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool",
-    "o", "", "specify output file name");
+    "o", "", "Specify output file name");
 
 KNOB<UINT64> KnobFastForwardCount(KNOB_MODE_WRITEONCE, "pintool",
-    "f", "0", "no of instructions to fast forward before starting the benchmarking");
+    "f", "0", "No of instructions to fast forward before starting the benchmarking");
 
 KNOB<UINT64> KnobInsCount(KNOB_MODE_WRITEONCE, "pintool",
-    "c", "0", "no of instructions to run during the benchmarking");
+    "c", "0", "No of instructions to run during the benchmarking");
 
 // This function is called when the application exits
 VOID Fini(INT32 code, VOID *v)
