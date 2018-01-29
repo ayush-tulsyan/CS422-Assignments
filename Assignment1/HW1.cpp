@@ -52,7 +52,7 @@ ADDRINT FastForwardCheck(void) {
 }
 
 void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores,
-                               UINT32 ins_type, UINT32 num_mem_operands,
+                               UINT32 ins_type, UINT ins_mem_size,
                                UINT32 num_mem_read_op, UINT32 num_mem_write_op,
                                ADDRDELTA min_ins_displacement,
                                ADDRDELTA max_ins_displacement
@@ -63,14 +63,16 @@ void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores,
     ins_type_count[ins_type] ++;
 
     // Part D
-    num_mem_op_count[num_mem_operands] += 1;
-    num_mem_read_op_count[num_mem_read_op] += 1;
-    num_mem_write_op_count[num_mem_write_op] += 1;
+    num_mem_op_count[num_mem_read_op+num_mem_write_op] += 1;
+    if (num_mem_read_op+num_mem_write_op > 0){
+        num_mem_read_op_count[num_mem_read_op] += 1;
+        num_mem_write_op_count[num_mem_write_op] += 1;
+    }
 
-    UINT32 num_mem_bytes_touched = (num_loads + num_stores) << 2;
-    num_mem_ins += (num_mem_bytes_touched > 0);
-    max_mem_bytes_touched = (num_mem_bytes_touched>max_mem_bytes_touched)?
-                             num_mem_bytes_touched:max_mem_bytes_touched;
+    num_mem_ins += (ins_mem_size > 0);
+    total_mem_ins_size += ins_mem_size;
+    max_mem_bytes_touched = (ins_mem_size > max_mem_bytes_touched)?
+                             ins_mem_size : max_mem_bytes_touched;
     min_displacement = (min_displacement < min_ins_displacement)?
                         min_displacement : min_ins_displacement;
     max_displacement = (max_displacement > max_ins_displacement)?
@@ -187,7 +189,7 @@ UINT32 DecodeInsInfo(INS ins, UINT32& num_loads, UINT32& num_stores) {
  * For printing stats found in parts A, B, C, and D of the assignment
  */
 void PrintStats(void) {
-    OutFile << "Instruction type data: \n";
+    OutFile << "Instruction Type Results: \n";
     // OutFile << footprint_data[0] <<"\n";
 
     // Part A,B
@@ -207,6 +209,42 @@ void PrintStats(void) {
     OutFile << "CPI: " << 1.0D*total_cycles/
                (icount - fast_forward_count) << '\n';
 
+    // Part D
+    OutFile << "Instruction Size Results:" << endl;
+    for(int i=0; i<=MAX_INS_SIZE;i++){
+        OutFile << i << ": " << ins_len_count[i] << endl;
+    }
+
+    OutFile << "Memory Instruction Operand Results:" << endl;
+    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
+        OutFile << i << ": " << num_mem_op_count[i] << endl;
+    }
+
+    OutFile << "Memory Instruction Read Operand Results:" << endl;
+    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
+        OutFile << i << ": " << num_mem_read_op_count[i] << endl;
+    }
+
+    OutFile << "Memory Instruction Write Operand Results:" << endl;
+    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
+        OutFile << i << ": " << num_mem_write_op_count[i] << endl;
+    }
+
+    OutFile << "Instruction Operand Results:" << endl;
+    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
+        OutFile << i << ": " << num_operand_count[i] << endl;
+    }
+
+    OutFile << "Instruction Register Read Operand Results:" << endl;
+    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
+        OutFile << i << ": " << num_reg_read_op_count[i] << endl;
+    }
+
+    OutFile << "Instruction Register Write Operand Results:" << endl;
+    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
+        OutFile << i << ": " << num_reg_write_op_count[i] << endl;
+    }
+
     // Part C
     int num_ins_blocks = 0, num_data_blocks = 0;
     for(int i=0;i<NUM_MEMORY_BLOCKS;i++){
@@ -218,51 +256,16 @@ void PrintStats(void) {
     OutFile << FootprintTypeLiterals[DATA_FOOTPRINT] << ": " << num_data_blocks<< "\n";
 
     // Part D
-    OutFile << "Instruction Size distribution:" << endl;
-    for(int i=0; i<=MAX_INS_SIZE;i++){
-        OutFile << i << ": " << ins_len_count[i] << endl;
-    }
-
-    OutFile << "Operand count distribution:" << endl;
-    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
-        OutFile << i << ": " << num_operand_count[i] << endl;
-    }
-
-    OutFile << "Register read operand count distribution:" << endl;
-    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
-        OutFile << i << ": " << num_reg_read_op_count[i] << endl;
-    }
-
-    OutFile << "Register write operand count distribution:" << endl;
-    for(int i=0; i<=MAX_NUM_OPERANDS;i++){
-        OutFile << i << ": " << num_reg_write_op_count[i] << endl;
-    }
-
-    OutFile << "Memory operand count distribution:" << endl;
-    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
-        OutFile << i << ": " << num_mem_op_count[i] << endl;
-    }
-
-    OutFile << "Read memory operand count distribution:" << endl;
-    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
-        OutFile << i << ": " << num_mem_read_op_count[i] << endl;
-    }
-
-    OutFile << "Write memory operand count distribution:" << endl;
-    for(int i=0; i<=MAX_NUM_MEMOPS;i++){
-        OutFile << i << ": " << num_mem_write_op_count[i] << endl;
-    }
-
-    OutFile << "Maximum number of bytes touched in one memory instruction: " <<
+    OutFile << "Maximum number of bytes touched by an instruction: " <<
             max_mem_bytes_touched << "\n";
-    OutFile << "Average number of bytes touched by any `memory` instruction " <<
-            ((float)(load_store_count << 2))/num_mem_ins << "\n";
-    OutFile << "Minimum value of immediate: " << min_immediate << "\n";
+    OutFile << "Average number of bytes touched by an instruction: " <<
+            ((float)(total_mem_ins_size))/num_mem_ins << "\n";
     OutFile << "Maximum value of immediate: " << max_immediate << "\n";
-    OutFile << "Minimum value of displacement in memory addressing: " <<
-            min_displacement << "\n";
-    OutFile << "Maximum value of displacement in memory addressing: " <<
+    OutFile << "Minimum value of immediate: " << min_immediate << "\n";
+    OutFile << "Maximum value of displacement used in memory addressing: " <<
             max_displacement << "\n";
+    OutFile << "Minimum value of displacement used in memory addressing: " <<
+            min_displacement << "\n";
 }
 
 /*
@@ -271,7 +274,7 @@ void PrintStats(void) {
  */
 void ExitHandler(void) {
     // OutFile << fixed << setprecision(6);
-    OutFile << "The number of instructions executed: " << icount - fast_forward_count << endl;
+    // OutFile << "The number of instructions executed: " << icount - fast_forward_count << endl;
 
     PrintStats();
     exit(0);
@@ -296,6 +299,7 @@ VOID Instruction(INS ins, VOID *v) {
     UINT32 num_reg_writes = INS_MaxNumWRegs(ins);
     UINT32 num_mem_read_op = 0;
     UINT32 num_mem_write_op = 0;
+    UINT32 ins_mem_size = 0;
     ADDRDELTA min_ins_displacement = INT_MAX, max_ins_displacement = INT_MIN;
     INT32 min_ins_immediate= INT_MAX, max_ins_immediate= INT_MIN;
 
@@ -312,13 +316,15 @@ VOID Instruction(INS ins, VOID *v) {
 
     // Iterate over each memory operand of the instruction to get its memory footprint
     for (UINT32 memOp = 0; memOp < num_mem_operands; memOp++) {
+        UINT32 mem_op_size = INS_MemoryOperandSize(ins, memOp);
+        ins_mem_size += mem_op_size;
 
         // Get footprint for the memory operands
         INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
         INS_InsertThenCall(
                 ins, IPOINT_BEFORE, (AFUNPTR) FootprintRoutine,
                 IARG_MEMORYOP_EA, memOp,
-                IARG_UINT32, INS_MemoryOperandSize(ins, memOp),
+                IARG_UINT32, mem_op_size,
                 IARG_UINT32, DATA_FOOTPRINT,
                 IARG_END);
 
@@ -359,7 +365,7 @@ VOID Instruction(INS ins, VOID *v) {
             IARG_UINT32, ins_type,
 
             // Part D
-            IARG_UINT32, num_mem_operands,
+            IARG_UINT32, ins_mem_size,
             IARG_UINT32, num_mem_read_op,
             IARG_UINT32, num_mem_write_op,
             IARG_ADDRINT, min_ins_displacement,

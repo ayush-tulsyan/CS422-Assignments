@@ -4,9 +4,9 @@
 
 const int NUM_INS_TYPE = 17;
 const int NUM_FOOTPRINT_TYPE = 2;
-const int NUM_MEMORY_BLOCKS = (1<<27);
-const int MAX_INS_SIZE = 20;
-const int MAX_NUM_OPERANDS = 10;
+const int NUM_MEMORY_BLOCKS = (1<<28);
+const int MAX_INS_SIZE = 19;
+const int MAX_NUM_OPERANDS = 9;
 const int MAX_NUM_MEMOPS = 4;
 
 enum InsType{
@@ -96,6 +96,7 @@ static UINT64 num_mem_op_count[MAX_NUM_MEMOPS+1] = {};
 static UINT64 num_mem_read_op_count[MAX_NUM_MEMOPS+1] = {};
 static UINT64 num_mem_write_op_count[MAX_NUM_MEMOPS+1] = {};
 
+static UINT64 total_mem_ins_size = 0;
 static UINT32 max_mem_bytes_touched = 0;
 static UINT32 num_mem_ins = 0;
 
