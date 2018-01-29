@@ -95,3 +95,9 @@ static UINT64 num_reg_write_op_count[MAX_NUM_OPERANDS+1] = {};
 static UINT64 num_mem_op_count[MAX_NUM_MEMOPS+1] = {};
 static UINT64 num_mem_read_op_count[MAX_NUM_MEMOPS+1] = {};
 static UINT64 num_mem_write_op_count[MAX_NUM_MEMOPS+1] = {};
+
+static UINT32 max_mem_bytes_touched = 0;
+static UINT32 num_mem_ins = 0;
+
+static INT32 min_immediate = INT_MAX, max_immediate = INT_MIN;
+static INT32 min_displacement = INT_MAX, max_displacement = INT_MIN;

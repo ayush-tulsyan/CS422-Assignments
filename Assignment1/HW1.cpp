@@ -53,7 +53,9 @@ ADDRINT FastForwardCheck(void) {
 
 void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores,
                                UINT32 ins_type, UINT32 num_mem_operands,
-                               UINT32 num_mem_read_op, UINT32 num_mem_write_op
+                               UINT32 num_mem_read_op, UINT32 num_mem_write_op,
+                               ADDRDELTA min_ins_displacement,
+                               ADDRDELTA max_ins_displacement
                                ) {
     // Part A and B
     ins_type_count[LOADS] += num_loads;
@@ -64,15 +66,30 @@ void PredicatedAnalysisRoutine(UINT32 num_loads, UINT32 num_stores,
     num_mem_op_count[num_mem_operands] += 1;
     num_mem_read_op_count[num_mem_read_op] += 1;
     num_mem_write_op_count[num_mem_write_op] += 1;
+
+    UINT32 num_mem_bytes_touched = (num_loads + num_stores) << 2;
+    num_mem_ins += (num_mem_bytes_touched > 0);
+    max_mem_bytes_touched = (num_mem_bytes_touched>max_mem_bytes_touched)?
+                             num_mem_bytes_touched:max_mem_bytes_touched;
+    min_displacement = (min_displacement < min_ins_displacement)?
+                        min_displacement : min_ins_displacement;
+    max_displacement = (max_displacement > max_ins_displacement)?
+                        max_displacement : max_ins_displacement;
 }
 
 void NonPredicatedAnalysisRoutine(UINT32 ins_len, UINT32 num_operands,
-                                  UINT32 num_reg_reads, UINT32 num_reg_writes) {
+                                  UINT32 num_reg_reads, UINT32 num_reg_writes,
+                                  INT32 min_ins_immediate,
+                                  INT32 max_ins_immediate) {
     // Part D
     ins_len_count[ins_len] += 1;
     num_operand_count[num_operands] += 1;
     num_reg_read_op_count[num_reg_reads] += 1;
     num_reg_write_op_count[num_reg_writes] += 1;
+    min_immediate = (min_immediate < min_ins_immediate)?
+                        min_immediate : min_ins_immediate;
+    max_immediate = (max_immediate > max_ins_immediate)?
+                        max_immediate : max_ins_immediate;
 }
 
 /*
@@ -235,6 +252,17 @@ void PrintStats(void) {
     for(int i=0; i<=MAX_NUM_MEMOPS;i++){
         OutFile << i << ": " << num_mem_write_op_count[i] << endl;
     }
+
+    OutFile << "Maximum number of bytes touched in one memory instruction: " <<
+            max_mem_bytes_touched << "\n";
+    OutFile << "Average number of bytes touched by any `memory` instruction " <<
+            ((float)(load_store_count << 2))/num_mem_ins << "\n";
+    OutFile << "Minimum value of immediate: " << min_immediate << "\n";
+    OutFile << "Maximum value of immediate: " << max_immediate << "\n";
+    OutFile << "Minimum value of displacement in memory addressing: " <<
+            min_displacement << "\n";
+    OutFile << "Maximum value of displacement in memory addressing: " <<
+            max_displacement << "\n";
 }
 
 /*
@@ -268,6 +296,9 @@ VOID Instruction(INS ins, VOID *v) {
     UINT32 num_reg_writes = INS_MaxNumWRegs(ins);
     UINT32 num_mem_read_op = 0;
     UINT32 num_mem_write_op = 0;
+    ADDRDELTA min_ins_displacement = INT_MAX, max_ins_displacement = INT_MIN;
+    INT32 min_ins_immediate= INT_MAX, max_ins_immediate= INT_MIN;
+
 
     // Part C
     // Instrument the instruction for its memory footprint
@@ -281,7 +312,6 @@ VOID Instruction(INS ins, VOID *v) {
 
     // Iterate over each memory operand of the instruction to get its memory footprint
     for (UINT32 memOp = 0; memOp < num_mem_operands; memOp++) {
-        if(memOp!=0) std::cout<<"The memory op is "<<memOp<<"\n";
 
         // Get footprint for the memory operands
         INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
@@ -299,6 +329,23 @@ VOID Instruction(INS ins, VOID *v) {
         if (INS_MemoryOperandIsWritten(ins, memOp)){
             ++ num_mem_write_op;
         }
+
+        ADDRDELTA displacement = INS_OperandMemoryDisplacement(ins, memOp);
+        min_ins_displacement = (displacement < min_ins_displacement) ?
+                            displacement : min_ins_displacement;
+        max_ins_displacement = (displacement > max_ins_displacement) ?
+                            displacement : max_ins_displacement;
+    }
+
+    // Iterate over all operands to find max/min immediates
+    for (UINT32 op = 0; op < num_operands; op++) {
+        if (INS_OperandIsImmediate(ins, op)) {
+            INT32 immediate = INS_OperandImmediate(ins, op);
+            max_ins_immediate = (immediate > max_ins_immediate)?
+                immediate:max_ins_immediate;
+            min_ins_immediate = (immediate < min_ins_immediate)?
+                immediate:min_ins_immediate;
+        }
     }
 
     INS_InsertIfPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck,
@@ -315,6 +362,8 @@ VOID Instruction(INS ins, VOID *v) {
             IARG_UINT32, num_mem_operands,
             IARG_UINT32, num_mem_read_op,
             IARG_UINT32, num_mem_write_op,
+            IARG_ADDRINT, min_ins_displacement,
+            IARG_ADDRINT, max_ins_displacement,
             IARG_END);
 
     INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR) FastForwardCheck, IARG_END);
@@ -326,6 +375,8 @@ VOID Instruction(INS ins, VOID *v) {
             IARG_UINT32, num_operands,
             IARG_UINT32, num_reg_reads,
             IARG_UINT32, num_reg_writes,
+            IARG_ADDRINT, min_ins_immediate,
+            IARG_ADDRINT, max_ins_immediate,
             IARG_END);
 
     // Insert a call to InsCount before every instruction
