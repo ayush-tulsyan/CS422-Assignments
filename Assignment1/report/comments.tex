@@ -1,1 +1,22 @@
+Lots of data structures have been used to maintain the statistics. The choice has been done so that the space used by these lies within 1 GB and the number of instrutions executed by the analysis functions are minimum. \par
 
+Each instruction is decoded within Instruction routine and all parameters are then passed to analysis routines.
+
+The data structures have been listed in counters.h file \par
+
+\begin{itemize}
+    \item PART A
+    DecodeInsInfo Routine finds the instruction type, number of loads and stores (considering bus width to be limit for 1 memory operation). Analysis routine increments the corresponding counters
+
+    \item Part B
+    Using statistics from Part A, we calculate the total number of cycles used. The number of instruction is taken to be 1E+9 (and not the summation of counters)
+
+    \item Part C
+    Two boolean arrays, each of length $2^{27}$ are used. One records the memory footprint of instructions and the other records for data. Each boolean item corresponds to one block in the cache. Since, each block is 32 bytes long, there are total $2^{27}$ blocks in the virtual address space, all initialized as 0 \par
+    A function by the name FootprintRoutine is used to mark the blocks. For each data/instruction fetch, this routine is invoked once. The routine just sets the boolean value corresponding to accessed block. \par
+    ExitRoutine function iterates over these arrays to count the number of touched blocks
+
+    \item Part D
+    Various arrays and counters maintain the required statistics. This is straight forward. Distribution for instruction length, number of operands, number of register read/write operands, number of memory operands, and number of memory read/write operands can be maintained using simple arrays. The other 3 pair of values need some counters
+
+\end{itemize}
