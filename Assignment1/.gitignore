@@ -2,4 +2,8 @@
 spec_2006/
 spec_2006.zip
 
+# link to pin dir
 PIN_TOOL
+
+# result files
+!results/*.out

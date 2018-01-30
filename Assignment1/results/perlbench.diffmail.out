@@ -1,0 +1,99 @@
+Instruction Type Results: 
+Loads: 356203304 (0.228005)
+Stores: 206221408 (0.132002)
+NOPs: 974707 (0.000623908)
+Direct calls: 12843565 (0.00822115)
+Indirect calls: 2813126 (0.00180068)
+Returns: 15656695 (0.0100218)
+Unconditional branches: 30501984 (0.0195243)
+Conditional branches: 130065739 (0.0832549)
+Logical operations: 100375207 (0.06425)
+Rotate and Shift: 4272765 (0.00273499)
+Flag operations: 868515 (0.000555935)
+Vector instructions: 0 (0)
+Conditional moves: 0 (0)
+MMX and SSE instructions: 0 (0)
+System calls: 0 (0)
+Floating point instructions: 954096 (0.000610715)
+The rest: 700508425 (0.448394)
+CPI: 29.1211
+Instruction Size Results:
+0: 0
+1: 117568177
+2: 256862334
+3: 275033288
+4: 52953505
+5: 78550590
+6: 185057308
+7: 33974758
+8: 28
+9: 0
+10: 12
+11: 0
+12: 0
+13: 0
+14: 0
+15: 0
+16: 0
+17: 0
+18: 0
+19: 0
+Memory Instruction Operand Results:
+0: 453449920
+1: 530898226
+2: 15486678
+3: 0
+4: 0
+Memory Instruction Read Operand Results:
+0: 191126546
+1: 354389509
+2: 868849
+3: 0
+4: 0
+Memory Instruction Write Operand Results:
+0: 340640529
+1: 205744375
+2: 0
+3: 0
+4: 0
+Instruction Operand Results:
+0: 974707
+1: 1077837
+2: 520433314
+3: 355077497
+4: 103530497
+5: 15658390
+6: 3247758
+7: 0
+8: 0
+9: 0
+Instruction Register Read Operand Results:
+0: 10216374
+1: 259878278
+2: 537904662
+3: 179178891
+4: 7007352
+5: 2566685
+6: 3247758
+7: 0
+8: 0
+9: 0
+Instruction Register Write Operand Results:
+0: 136065207
+1: 684887585
+2: 175795754
+3: 2382582
+4: 868872
+5: 0
+6: 0
+7: 0
+8: 0
+9: 0
+Instruction Blocks Accesses: 2808
+Data Blocks Accesses: 31195
+Maximum number of bytes touched by an instruction: 8
+Average number of bytes touched by an instruction: 3.73924
+Maximum value of immediate: 2147483647
+Minimum value of immediate: -2147483648
+Maximum value of displacement used in memory addressing: 135918104
+Minimum value of displacement used in memory addressing: -1408
