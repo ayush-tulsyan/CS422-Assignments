@@ -28,7 +28,7 @@ private:
     static const std::size_t CPT_INDEX_MASK = (CPT_SIZE - 1);
     static const counter_t PHT_INIT_0 = /* strongly not taken */ 0;
     static const counter_t PHT_INIT_1 = /* strongly taken */ 3;
-    static const counter_t CPT_INIT = /* weakly towards 1 */ 2;
+    static const counter_t CPT_INIT = /* weakly towards 0 */ 1;
 
     history_t bhr;                      // 13 bits
     std::vector<counter_t> pht[2];      // 32K bits
@@ -85,17 +85,20 @@ public:
             counter_t choice_cnt = cpt[cpt_idx];
             bool choice = counter_msb(choice_cnt);
             counter_t pht_cnt = pht[choice][pht_idx];
+            counter_t pht_cnt_updated;
 
             if (taken)
-                pht_cnt = counter_inc(pht_cnt);
+                pht_cnt_updated = counter_inc(pht_cnt);
             else
-                pht_cnt = counter_dec(pht_cnt);
-            pht[choice][pht_idx] = pht_cnt;
+                pht_cnt_updated = counter_dec(pht_cnt);
+            pht[choice][pht_idx] = pht_cnt_updated;
 
-            if ((counter_msb(pht_cnt) == taken) ^ (!choice))
-                choice_cnt = counter_inc(choice_cnt);
-            else
-                choice_cnt = counter_dec(choice_cnt);
+            if (counter_msb(pht_cnt) == counter_msb(pht_cnt_updated)) {
+                if (counter_msb(pht_cnt_updated) == taken)
+                    choice_cnt = (choice==1)?counter_inc(choice_cnt):counter_dec(choice_cnt);
+                else
+                    choice_cnt = (choice==1)?counter_dec(choice_cnt):counter_inc(choice_cnt);
+            }
             cpt[cpt_idx] = choice_cnt;
 
             update_bhr(taken);
