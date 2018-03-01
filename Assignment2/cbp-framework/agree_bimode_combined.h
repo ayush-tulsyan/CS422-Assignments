@@ -20,23 +20,31 @@ private:
     typedef uint32_t history_t;
     typedef uint8_t counter_t;
 
-    static const int BHR_LENGTH = 14, BST_WIDTH = 14, BST_INIT_WIDTH = 14;
+    static const int BHR_LENGTH = 13, CPT_WIDTH = 13;
+    static const int BST_WIDTH = 13, BST_INIT_WIDTH = 13;
     static const history_t BHR_MSB = (history_t(1) << (BHR_LENGTH - 1));
     static const std::size_t PHT_SIZE = (std::size_t(1) << BHR_LENGTH);
     static const std::size_t PHT_INDEX_MASK = (PHT_SIZE - 1);
+    static const std::size_t CPT_SIZE = (std::size_t(1) << CPT_WIDTH);
+    static const std::size_t CPT_INDEX_MASK = (CPT_SIZE - 1);
     static const std::size_t BST_SIZE = (std::size_t(1) << BST_WIDTH);
     static const std::size_t BST_INDEX_MASK = (BST_SIZE - 1);
-    static const counter_t PHT_INIT = /* weakly taken */ 2;
+    static const counter_t PHT_INIT_0 = /* strongly not taken */ 0;
+    static const counter_t PHT_INIT_1 = /* strongly taken */ 3;
+    static const counter_t CPT_INIT = /* weakly towards 0 */ 1;
     static const counter_t BST_INIT = 0;
 
     history_t bhr;                      // 13 bits
-    std::vector<counter_t> pht;         // 32K bits
-    std::vector<counter_t> bst;         // 16K bits
-    std::vector<counter_t> bst_init;    // 16K bits
+    std::vector<counter_t> pht[2];      // 32K bits
+    std::vector<counter_t> cpt;         // 16K bits
+    std::vector<counter_t> bst;         // 8K bits
+    std::vector<counter_t> bst_init;    // 8K bits
 
     void update_bhr(bool taken) { bhr >>= 1; if (taken) bhr |= BHR_MSB; }
     static std::size_t pht_index(address_t pc, history_t bhr)
     { return (static_cast<std::size_t>(pc ^ bhr) & PHT_INDEX_MASK); }
+    static std::size_t cpt_index(address_t pc)
+    { return (static_cast<std::size_t> (pc) & CPT_INDEX_MASK ); }
     static std::size_t bst_index(address_t pc)
     { return (static_cast<std::size_t> (pc) & BST_INDEX_MASK); }
 
@@ -47,7 +55,12 @@ private:
     { if (cnt != 0) --cnt; return cnt; }
 
 public:
-    PREDICTOR(void) : bhr(0), pht(PHT_SIZE, counter_t(PHT_INIT)),
+    PREDICTOR(void) : bhr(0),
+    pht{
+        {std::vector <counter_t>(PHT_SIZE, counter_t(PHT_INIT_0)) },
+        {std::vector <counter_t>(PHT_SIZE, counter_t(PHT_INIT_1)) }
+    },
+    cpt(CPT_SIZE, counter_t(CPT_INIT)),
     bst(BST_SIZE, counter_t(BST_INIT)), bst_init(BST_SIZE, counter_t(0))
     { }
     // uses compiler generated copy constructor
@@ -65,14 +78,17 @@ public:
         if (/* conditional branch */ br->is_conditional) {
             address_t pc = br->instruction_addr;
             std::size_t pht_idx = pht_index(pc, bhr);
+            bool choice = counter_msb(cpt[cpt_index(pc)]);
+            counter_t cnt = pht[choice][pht_idx];
+
             std::size_t bst_idx = bst_index(pc);
+            counter_t bias = bst[bst_idx];
+
             if ( bst_init[bst_idx] == 0 ) {
-                prediction = counter_msb(pht[pht_idx]);
+                prediction = counter_msb(cnt);
             }
             else {
-                counter_t bias = bst[bst_idx];
-                counter_t pht_pred = pht[pht_idx];
-                if ( bias == counter_msb(pht_pred) ) prediction = true;
+                if ( bias == counter_msb(cnt) ) prediction = true;
                 else prediction = false;
             }
         }
@@ -86,26 +102,42 @@ public:
     {
         if (/* conditional branch */ br->is_conditional) {
             address_t pc = br->instruction_addr;
+
             std::size_t pht_idx = pht_index(pc, bhr);
+            std::size_t cpt_idx = cpt_index(pc);
+            counter_t choice_cnt = cpt[cpt_idx];
+            bool choice = counter_msb(choice_cnt);
+            counter_t pht_cnt = pht[choice][pht_idx];
+            counter_t pht_cnt_updated;
+
             std::size_t bst_idx = bst_index(pc);
-            // [TODO]: To set the bias bit optimally
+            counter_t bias = bst[bst_idx];
+
             if ( bst_init[bst_idx] == 0 ) {
                 bst_init[bst_idx] = 1;
                 bst[bst_idx] = taken;
             }
             else {
-                counter_t bias = bst[bst_idx];
-                counter_t pht_pred = pht[pht_idx];
                 if ( bias == taken )
-                    pht_pred = counter_inc(pht_pred);
+                    pht_cnt_updated = counter_inc(pht_cnt);
                 else
-                    pht_pred = counter_dec(pht_pred);
-                pht[pht_idx] = pht_pred;
+                    pht_cnt_updated = counter_dec(pht_cnt);
+                pht[choice][pht_idx] = pht_cnt_updated;
+
+                if (counter_msb(pht_cnt) == counter_msb(pht_cnt_updated)) {
+                    if ( ( !(bias ^ counter_msb(pht_cnt_updated))) == taken )
+                        choice_cnt = (choice==1)?counter_inc(choice_cnt):counter_dec(choice_cnt);
+                    else
+                        choice_cnt = (choice==1)?counter_dec(choice_cnt):counter_inc(choice_cnt);
+                }
+                cpt[cpt_idx] = choice_cnt;
             }
+
             update_bhr(taken);
         }
     }
 };
 
 #endif // PREDICTOR_H_SEEN
+
 
