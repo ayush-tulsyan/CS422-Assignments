@@ -1,5 +1,5 @@
 /* Author: Jared Stark;   Created: Tue Jul 27 13:39:15 PDT 2004
- * Description: This file defines a gshare branch predictor.
+ * Description: This file defines a perceptron branch predictor.
  */
 
 #ifndef PREDICTOR_H_SEEN
@@ -60,8 +60,8 @@ public:
         counter_t y = pt[pt_idx][0];
         history_t bhr_copy = bhr;
 
-        for(int i = 1; i <= BHR_LENGTH; ++i, bhr_copy <<= 1) {
-            if (bhr_copy & BHR_MSB)
+        for(int i = 1; i <= BHR_LENGTH; ++i, bhr_copy >>= 1) {
+            if (bhr_copy & 1)
                 y += pt[pt_idx][i];
             else
                 y -= pt[pt_idx][i];
@@ -101,13 +101,13 @@ public:
 
             counter_t y_abs = y*((prediction)?1:-1);
 
-            if ((prediction != taken) & (y_abs <= PT_WEIGHT_LIMIT)) {
+            if ((prediction != taken) || (y_abs <= PT_WEIGHT_LIMIT)) {
                 counter_t t = (taken) ? 1 : -1;
                 address_t bhr_copy = bhr;
 
                 pt[pt_idx][0] += t;
-                for (std::size_t i = 1; i <= BHR_LENGTH; ++i, bhr_copy <<= 1) {
-                    if ((bhr_copy & BHR_MSB) == taken)
+                for (std::size_t i = 1; i <= BHR_LENGTH; ++i, bhr_copy >>= 1) {
+                    if ((bhr_copy & 1) == taken)
                         pt[pt_idx][i] += 1;
                     else
                         pt[pt_idx][i] -= 1;
