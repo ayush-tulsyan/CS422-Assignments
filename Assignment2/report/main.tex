@@ -3,7 +3,7 @@
 % The cls file is a modified from  'sig-alternate.cls'
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass{sig-alternate} 
+\documentclass{sig-alternate}
 \usepackage{mathptmx} % This is Times font
 
 \newcommand{\ignore}[1]{}
@@ -28,9 +28,9 @@
   \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
   \fancyhead[C]{\normalsize{ISCA 2018 Submission
-      \textbf{\#\iscasubmissionnumber} \\ Confidential Draft: DO NOT DISTRIBUTE}} 
+      \textbf{\#\iscasubmissionnumber} \\ Confidential Draft: DO NOT DISTRIBUTE}}
   \fancyfoot[C]{\thepage}
-}  
+}
 
 \pagenumbering{arabic}
 
@@ -46,123 +46,119 @@
 
 \begin{abstract}
 
-This document is intended to serve as a sample for submissions to ISCA 2018. We provide some guidelines that authors should follow when submitting papers to the conference. In an effort to respect the efforts of reviewers and in the interest of fairness to all prospective authors, we request that all submissions follow the formatting and submission rules detailed below. 
+In this report we present a comparison of the 3 famous branch predictors namely gshare, bimode, and agree in terms of the MPPKI on the provided traces. After that we present a new branch predictor that is based on the combination of bimode and agree predictors. Then we give a detailed description of the hardware budget of our predictor.
 
 \end{abstract}
 
-\section{Submission Guidelines}
+\section{Background Information}
 
-This document is intended to serve as a sample for submissions to ISCA 2018. It is heavily derived from previous conferences, in particular MICRO 2015, HPCA 2017, and ISCA 2017.
-
-We provide some guidelines that authors should follow when submitting papers to the conference. \textbf{This format is derived from the ACM \texttt{sig-alternate.cls} file, with the major difference that it is 10pt Times font}.
-
-In an effort to respect the efforts of reviewers and in the interest of fairness to all prospective authors, we request that all submissions follow the formatting and submission rules detailed below. Submissions that (grossly) violate these instructions may not be reviewed, at the discretion of the Program Chair, in order to maintain a review process that is fair to all potential authors.
-
-\vspace{1ex}In a nutshell:
-
-\begin{itemize}
-\item Paper must be submitted in printable PDF format.
-\item Text must be minimum 10pt Times font.
-\item Papers must be at most 11 pages, not including references, in two-column format.
-\item References must include all authors to facilitate the reviewing process (no \emph{et al.})
-\item There is no page limit for references.
-\end{itemize}
-
-\section{Paper Formatting}
-
-Papers must be submitted in printable PDF format and should contain a maximum of 11 pages of single-spaced, two-column text, not including references. You may include any number of pages for references, but see below for more instructions.
-
-\begin{itemize}
-
-\item If you are using \LaTeX~\cite{lamport94}to typeset your paper, then we strongly recommend that you use the template provided. \textbf{Please set your document to Times font \\ (\texttt{\textbackslash usepackage\{mathptmx\}}) and do not play with interline spacing}.
-
-\item If you are using a different software package to typeset your paper, then please adhere to the guidelines mentioned in the table below. \textbf{You must use 10pt Times font or larger}.
-
-\end{itemize}
+The results obtained on running our implementations of bimode and agree predictors are as follows (corresponding results obtained for gshare have also been added for comparision). The simulation were done by using traces from CBP framework. The hardware budget was kept uniform across these predictors which was 64 Kilobits.
 
 \begin{table}[h]
-\caption{Formatting guidelines.}
 
-\begin{tabular}{ll}
+\caption{Agree\cite{agreepaper}, Bimode\cite{bimodepaper} and Gshare\cite{gsharepaper}}
+\centering
+
+\begin{tabular}{llll}
+
 \hline
-Field &
-Value \\
+Trace & Agree & Bimode & Gshare \\
 \hline
-Page limit &
-11 pages w/o refs. \\
-Paper size &
-US Letter 8.5x11in \\
-Top margin &
-1in \\
-Bottom margin &
-1in \\
-Left margin &
-0.75in \\
-Right margin &
-0.75in \\
-Body &
-2-col., single-spaced \\
-Separation between columns &
-0.25in \\
-Body font &
-10pt Times \\
-Abstract font &
-10pt Times \\
-Section heading font &
-12pt, bold \\
-Subsection heading font &
-10pt, bold \\
-Caption font &
-9pt (minimum), bold \\
-References &
-8pt, no page limit \\
+DIST-INT-1 & 8.265 & 8.023 & 7.907 \\
+DIST-INT-2 & 9.206 & 8.844 & 8.708 \\
+DIST-INT-3 & 13.184 & 13.854 & 13.357 \\
+DIST-MM-1 & 9.164 & 9.230 & 9.119 \\
+DIST-MM-2 & 10.730 & 10.884 & 10.854 \\
+DIST-SERV-1 & 5.319 & 3.660 & 5.691 \\
+DIST-SERV-2 & 5.031 & 3.711 & 5.897 \\
+DIST-SERV-3 & 5.999 & 5.698 & 7.235 \\
+DIST-SERV-4 & 6.574 & 4.720 & 7.009 \\
+DIST-SERV-5 & 5.431 & 4.541 & 6.767 \\
 \hline
+
 \end{tabular}
 
 \end{table}
 
-Please ensure that you include page numbers with your submission. This makes it easier for the reviewers to refer to different parts of your paper when they provide comments. Please ensure that your submission has a banner at the top of the title page which contains the submission number and a notice of confidentiality.
+As can be observed, the gshare predictor performs better in the INT and MM traces. It is however beaten in the SERV traces and by a relatively large margin. It is also observed that bimode and agree perform better than gshare on different traces. More precisely, they express some sor of complementary behavior, which is one of the reasons for our combined predictor.\par
 
-\section{Content}
+\section{Motivation}
+One of the motivations for our combined predictor as already mentioned in the previous section is that both agree and bimode perform well as compared to gshare on different sets of traces. Thus if these can be combined in some fashion, the resultant predictor would be able to beat gshare on most of the traces. This is not so straight forward in any case. Since, the two predictors, Agree and bi-mode, were able to beat Gshare when they had the complete 64 Kb budget allocated to themselves. When we are implementing a hybrid predictor with a fixed budget, the two predictors will share the budget and will perform worse individually. \par
 
-\subsection{Author List}  Reviewing will be double-blind; therefore, please do not include any author names on any submitted documents except in the space provided on the submission form. You must also ensure that the metadata included in the PDF does not give away the authors. If you are improving upon your prior work, refer to your prior work in the third person and include a full citation for the work in the bibliography. For example, if you are building on your own prior work in the papers~\cite{nicepaper1,nicepaper2,nicepaper3}, you would say something like: ``While prior work did X, Y, and Z~\cite{nicepaper1,nicepaper2,nicepaper3}, this paper additionally does W, and is therefore much better.'' Do not omit or anonymize references for blind review. There is one exception to this for your own prior work that appeared in IEEE CAL, workshops without archived proceedings, etc., as discussed later in this document.
+The other motivation for combining them is negative interference(aliasing). Both of the predictors attempt to reduce the problem of negative interference. By combining them we might be able to reduce this problem to a larger extent as possible by both separately.
 
-Recall that, per IEEE authorship guidelines, it is not acceptable to award honorary authorship or gift authorship. Please keep these guidelines in mind while determining the author list of your paper. Also please note that addition/removal of authors once the paper is accepted will have to be approved by the Program Chair.
+\section{Description Joint-Agree-Bimode}
 
-\subsection{Figures and Tables}
+The PHT, consisting of 2 bit saturating counters, is divided into two equal parts like the bimode predictor, these two parts correspond to the two different behaviours of the branches. During a prediction the global history register(GHR) is xored with the branch address and then masked with the size of the PHTs to obtain the index to the 2-bit counters. 2 bit counters from each PHT are taken. A choice predictor, table of 2 bit saturating counters similar to the bimode predictor, is used to determine which of the two counters should be chosen for the final prediction.
 
-Ensure that the figures and tables are legible. Please also ensure that you refer to your figures in the main text. Many reviewers print the papers in gray-scale. Therefore, if you use colors for your figures, ensure that the different colors are highly distinguishable in gray-scale.
+The difference and where agree comes into the picture is how the prediction is done after the appropriate 2 bit counter is chosen. A bias bit is stored for each branch, like the agree predictor, and the prediction made by the 2 bit counter is matched with the bias bit to make the final decision regarding the branch outcome. Similar to the agree predictor, if the bias bit matches with the MSB of the 2 bit counter then  the predicted outcome is taken and it is not taken in case they do not match.
 
-\subsection{References}
+The update criteria of the combined predictor is also quite similar to the individual components. The 2 bit saturating counter of the chosen PHT is always updated with the actual outcome of the branch. It is updated on the basis of whether the bias matches with the output or not, like the agree predictor. The choice predictor is always updated except when the final outcome of the combined predictor after updating the PHT does agree with outcome and the outcome before the update of the PHT did not agree. In other words the choice predictor is supported if the predicted outcome is correct. The choice predictor is opposed when updated outcome also does not match with the expected. Supported depends on the whether it is for the taken PHT (incremented) or the not taken PHT(decremented) and vice versa for opposed. \par
 
-There is no length limit for references. Each reference must explicitly list all authors of the paper. Papers not meeting this requirement will be rejected.
+See figure 1 for a more clear idea. The branch address XORed with global history register is fed to Pattery history tables. The branch address itself is fed to choice table, bias table and bias\_init table.
 
-\section{Conflicts of Interest}
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale=0.35]{agree-bimode.png}
+    \caption{Block diagram for the proposed predictor model}
+    \label{fig:fig1}
+\end{figure}
 
-Authors must register all their conflicts on the paper submission site. Conflicts are needed to ensure appropriate assignment of reviewers. If a paper is found to have an undeclared conflict that causes a problem OR if a paper is found to declare false conflicts in order to abuse or game the review system, the paper may be rejected.
+\section{Hardware Budget}
 
-Please declare a conflict of interest with the following people for any author of your paper.
-A conflict occurs in the following cases:
+The available budget of 64 Kbits has to be divided into 4 tables, 2 Pattern History Table, 1 Choice Table and 1 Bias table. The first three tables(2 PHTs and CPT), use 2-bit counters which the bias table stores only booleans. The implementation of bias table requires another set of counters. These counters denote if their corresponding counter in the bias table has been initialized yet. These table will furthered be referred by bias\_init table. \par
+
+The budget is distributed among the above table as follows:
 \begin{enumerate}
-\item Between advisor and advisee forever. 
-\item Between family members forever. 
-\item Between people who have collaborated in the last 5 years. This collaboration can consist of a joint research or development project, a joint paper, or when there is direct funding from the potential reviewer (as opposed to company funding) to an author of the paper. Co-participation in professional activities, such as tutorials or studies, is not cause for conflict. When in doubt, the author should check with the Program Chair. 
-\item Between people from same institution or who were in the same institution in the last 5 years. 
-\item Between people whose relationship prevents the reviewer from being objective in his/her assessment
+    \item PHT: Two table of 2-bit counters with $2^{13}$ counters each. i.e. total $2^{15}$ bits
+    \item Choice table: One table with 2-bit counters with $2^{13}$ counters. i.e. total $2^{14}$ bits
+    \item Bias table: $2^{13}$ one bit counters. i.e. $2^{13}$ bits
+    \item Bias\_init table: similar to Bias table with $2^{13}$ bit counters.
 \end{enumerate}
 
+The above sum upto $2^{16}$ bits, i.e. 64 Kilobits. Besides these, a global branch history register is maintained for last 13 branches. which uses a 13 bit counter to store the history. This leads to a total hardware budget of $64K + 13$ bits\par
 
-``Service'' collaborations, such as co-authoring a report for a professional organization, serving on a program committee, or co-presenting tutorials, do not themselves create a conflict of interest. Co-authoring a paper that is a compendium of various projects with no true collaboration among the projects does not constitute a conflict among the authors of the different projects.
+\subsection{Results and Analysis}
 
-We hope to draw most reviewers from the PC and the ERC, but others from the community may also write reviews. Please declare all your conflicts (not just restricted to the PC and ERC). When in doubt, contact the Program Chair.
+The following table tabulates the results obtained for our combined bimode predictor, compared to the individual components and gshare.
 
-\section{Prior/Concurrent Submissions}
+\begin{table}[h]
 
-By submitting a manuscript, the authors guarantee that the manuscript has not been previously published or accepted for publication in a substantially similar form in any conference, journal, or the archived proceedings of a workshop (e.g., in the ACM digital library); but see exceptions below. The authors also guarantee that no paper that contains significant overlap with the contributions of the submitted paper will be under review for any other conference, journal, or workshop having archived proceedings during the review period. Violation of any of these conditions will lead to rejection.
+\caption{Agree\cite{agreepaper}, Bimode\cite{bimodepaper} and Gshare\cite{gsharepaper}}
+\centering
+\begin{tabular}{lllll}
+\hline
+Trace & Agree & Bimode & Gshare & Combined \\
+\hline
+DIST-INT-1 & 8.265 & 8.023 & 7.907 & 7.852 \\
+DIST-INT-2 & 9.206 & 8.844 & 8.708 & 8.869 \\
+DIST-INT-3 & 13.184 & 13.854 & 13.357 & 13.182 \\
+DIST-MM-1 & 9.164 & 9.230 & 9.119 & 9.466 \\
+DIST-MM-2 & 10.730 & 10.884 & 10.854 & 10.810 \\
+DIST-SERV-1 & 5.319 & 3.660 & 5.691 & 4.128 \\
+DIST-SERV-2 & 5.031 & 3.711 & 5.897 & 4.091 \\
+DIST-SERV-3 & 5.999 & 5.698 & 7.235 & 6.185 \\
+DIST-SERV-4 & 6.574 & 4.720 & 7.009 & 5.435 \\
+DIST-SERV-5 & 5.431 & 4.541 & 6.767 & 4.769 \\
+\hline
+\end{tabular}
+\end{table}
 
-The only exceptions to the above rules are for the authors' own papers in (1) workshops without archived proceedings such as in the ACM digital library (or where the authors chose not to have their paper appear in the archived proceedings), or (2) venues such as IEEE CAL where there is an explicit policy that such publication does not preclude longer conference submissions. In all such cases, the submitted manuscript may ignore the above work to preserve author anonymity. This information must, however, be provided to the Program Chair who  will make this information available to reviewers if it becomes necessary to ensure a fair review. As always, if you are in doubt, it is best to contact the Program Chair. 
+The average values overall the traces are as follows
+\begin{table}[h]
 
-Finally, we also note that the ACM Plagiarism Policy covers a range of ethical issues concerning the misrepresentation of other works or one's own work; please consult it carefully.
+\caption{Agree\cite{agreepaper}, Bimode\cite{bimodepaper} and Gshare\cite{gsharepaper}}
+\centering
+\begin{tabular}{llll}
+\hline
+Agree & Bimode & Gshare & Combined \\
+\hline
+7.8903 & 7.3165 & 8.254 & 7.478 \\
+\hline
+\end{tabular}
+\end{table}
+
+The observation we draw from the results is that our combined predictor clearly does not perform as good as the bimode predictor. This is may be because we have decreased the size of the choice predictor table to accommodate the bias bits for the agree predictions. We also observe that our predictor performs better on certain traces where the bimode does not perform as well but agree does. We observe that out combined predictor beats gshare on more traces than bimode, which implies that our predictor is somewhat more general and can be used in various traces, whereas the the bimode performs very well on only a few of them.
 
 %%%%%%% -- PAPER CONTENT ENDS -- %%%%%%%%
 
